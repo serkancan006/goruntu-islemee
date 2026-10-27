@@ -1,30 +1,60 @@
-# MumVision — Görüntü İşleme ile Mum Formasyonu Tespiti
+# MumVision — Mum grafiği veri seti ve CNN notebook'u
 
-Finansal mum grafiği **görüntüsünden** mum gövdelerini ve fitillerini çıkarıp 9 formasyonu tespit eden Python projesi. Büyük veri seti, gerçek piyasa OHLC verilerinin programatik olarak çizilmesiyle oluşturulur. Tespit sırasında CSV veya fiyat verisi okunmaz; yalnız görüntü pikselleri kullanılır.
+Proje iki bölümden oluşur:
 
-**Kapsam:** Doji, Çekiç, Ters Çekiç, Asılı Adam, Kayan Yıldız, Boğa Yutan, Ayı Yutan, Sabah Yıldızı ve Akşam Yıldızı. OBO, üçgen ve çift tepe/dip gibi uzun grafik formasyonları bu sürümün kapsamı dışındadır.
+- **`mumvision/`:** Yalnız veri dizininden sorumludur. Eksik sayısal OHLC verisini Binance'ten indirir, kurallarla formasyon etiketlerini belirler ve mum grafiği resimlerini oluşturur.
+- **[model_egitimi.ipynb](model_egitimi.ipynb):** Veri analizi, temizleme, ön işleme, örnek görüntüler, CNN eğitimi, validation/test grafikleri, model kaydı ve yükleyerek tekli tahmin adımlarını içerir. Gerekli eğitim/tahmin kodları notebook'un içindedir.
 
-## Hemen kullan
+Kapsam: Doji, Çekiç, Ters Çekiç, Asılı Adam, Kayan Yıldız, Boğa Yutan, Ayı Yutan, Sabah Yıldızı ve Akşam Yıldızı.
 
-Hazırlanan ortamda **`CALISTIR.bat` dosyasına çift tıkla**. “Örneği aç” ile çalışan örneği incele veya “Görüntü aç” ile kendi grafiğini seç. İlk sekmede fareyle dikdörtgen çizerek yalnız fiyat panelini kırp. Girdi, renk maskesi ve işaretli sonuç ayrı sekmelerdedir.
+## Kurulum
 
-Yeni bilgisayarda Python 3.12 kurulduktan sonra önce `KURULUM.bat`, sonra `CALISTIR.bat` çalıştırılır. Yerel ortam hazırsa yeniden kurulum gerekmez.
-
-PowerShell üzerinden:
-
-```powershell
-.\.venv\Scripts\python.exe -m mumvision.gui
-
-.\.venv\Scripts\python.exe -m mumvision detect outputs/demo_input.png
-```
-
-Kendi ekran görüntüsünden fiyat panelini sayısal olarak seçmek için:
+Proje kökünde PowerShell ile:
 
 ```powershell
-.\.venv\Scripts\python.exe -m mumvision detect "grafik.png" --roi 80 40 900 500 --output outputs/kendi_grafigim
+# .venv yoksa bir kez oluşturun.
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-`--roi`: sol üst x, sol üst y, genişlik, yükseklik. Çıktı kutuları kırpılan alana göredir. Çıktılar `annotated.png`, `mask.png`, `result.json` dosyalarıdır.
+Bütün bağımlılıklar tek `requirements.txt` dosyasındadır.
+
+## MumVision ile veri oluşturma
+
+Mevcut `data/` veri seti hazırsa bu adımı tekrar çalıştırmanız gerekmez. Veri dizininin varsayılanı `data/` klasörüdür. İlk üretim tek komutla yapılabilir:
+
+```powershell
+.\.venv\Scripts\python.exe -m mumvision build --count 100000
+```
+
+`build`, gereken ham CSV dosyalarından eksik olanları otomatik indirir; mevcut olanları kullanır. Veri üretim dönemini kronolojik bölüm tarihlerinden belirler. Kısmi indirmede diğer varlıkların kaynak/checksum kayıtları korunur. Yeni bir üretim deneyi için `--data data_yeni` seçin; mevcut veri setinin üzerine yazılmaz.
+
+Paketin iki komutu vardır: `download` ve `build`. Yalnız indirmek veya tarih aralığı seçmek isterseniz `python -m mumvision download --data data_yeni --start 2023-01 --end 2025-12` kullanabilirsiniz. Yardım için `python -m mumvision --help` çalıştırın.
+
+MumVision'ın ürettiği tüm dosyalar seçilen veri dizininin `cache/`, `raw/` ve `dataset/` klasörlerindedir. Formasyon kuralları yalnız veri etiketlerini üretmek için çalıştırılır. Model kaydı, tahmin raporu, loss grafikleri ve `outputs/` klasöründeki yeni deney çıktıları notebook'un sorumluluğundadır.
+
+İndirme kesilirse aynı komut doğrulanmış önbellekten devam eder. Mevcut `manifest.csv` üzerine yazılmaz. Küçük bir üretim denemesi için `--count 1000` kullanılabilir. `build --seed` ile örnek seçimi tekrarlanabilir. Tarih bölümleri `mumvision/dataset.py` içindeki `SPLITS` ile sabittir. Mevcut CSV dosyalarının tarih aralığını elle daralttıysanız gereken dönem için `download` komutunu yeniden çalıştırın; otomatik indirme, eksik CSV dosyalarını tamamlar.
+
+`patterns.py` içindeki kurallar, ham fiyatlardan veri seti etiketleri üretmek için gereklidir. `imaging.py` mum resimlerini ve etiket kutularını çizer.
+
+## Notebook ile eğitim ve tahmin
+
+`model_egitimi.ipynb` dosyasını açın, `.venv/Scripts/python.exe` çekirdeğini seçin ve hücreleri sırayla çalıştırın. Veri klasörünü notebook'taki `config.data` ayarında seçin. `QUICK_RUN=True` küçük bir akış denemesi yapar; tam veriyle eğitim için `False` yapın. Her çalıştırmada yeni deney klasörü oluşturulur.
+
+Akış: ham veri analizi → temizleme → kronolojik bölüm kontrolü → örnek resimler → RGB/resize/normalizasyon → CNN eğitimi → train/validation loss ve F1 → validation eşikleri → test özeti ve confusion matrix/PR/ROC → modeli kaydetme, yükleme ve tekli predict.
+
+CNN, görüntünün son mumunda tamamlanan formasyonları çok etiketli olarak öğrenir. Sınıf ağırlıkları eğitimden, tahmin eşikleri validation'dan hesaplanır. Test son değerlendirmede kullanılır. Kayıtlar ve grafikler `outputs/cnn_notebook_.../` altındadır:
+
+| Dosya | İçerik |
+|---|---|
+| `best_model.pt` | En düşük validation loss modeli, sınıflar, giriş boyutu ve validation eşikleri |
+| `history.csv`, `figures/learning_curves.png` | Train/validation loss ve F1 |
+| `TEST_OZETI.md`, `test_metrics.json`, `test_per_class.csv` | Test özeti ve sınıf bazında sonuçlar |
+| `figures/` | Dağılımlar, örnekler, ön işleme, confusion matrisleri, PR/ROC ve tekli tahmin |
+| `cleaned_raw/`, `raw_cleaning.csv`, `used_manifest.csv` | Temizleme kayıtları ve kullanılan örnekler |
+| `test_predictions.csv`, `test_probabilities.npz` | Örnek bazında test sonuçları |
+
+Notebook modelden kutu üretmez. Küçük denemenin ölçümleri tam veri başarısı olarak kullanılmamalıdır. `outputs/` kökündeki eski klasik yöntem raporları önceki çalışmalara aittir; güncel CNN sonuçları ilgili deney alt klasöründedir.
 
 ## Büyük veri seti
 
@@ -52,75 +82,41 @@ Hazır büyük bir veri seti olan [SP500-Chart-Dataset](https://github.com/Jaehy
 - Bölüm sınırını kesen veya arada eksik saat bulunan pencereler kullanılmaz.
 - Aynı ham mum farklı bölümlerde paylaşılmaz. Aynı bölümde pencereler örtüşebilir; görüntüler istatistiksel olarak bağımsız değildir.
 - Girdi görüntülerinde sınıf adı veya etiket kutusu bulunmaz; stil sınıfa göre seçilmez.
-- Tespit eşikleri test verisine göre ayarlanmaz.
+- Notebook tahmin eşiklerini yalnız doğrulama bölümünde seçer; test model veya eşik seçiminde kullanılmaz.
 
 ### Dosya düzeni
 
 ```text
-mumvision/                 Veri indirme, üretim, tespit, değerlendirme ve arayüz
-tests/                     Kurallar, geometri, zaman damgası, sızıntı kontrolleri
+mumvision/__main__.py      Yalnız download ve build komutları
+mumvision/download.py      Sayısal piyasa verisi indirme ve checksum kontrolü
+mumvision/dataset.py       Etiketli grafik veri seti ve kronolojik bölümler
+mumvision/imaging.py       PNG çizimi, nesne kutuları ve YOLO etiketleri
+mumvision/patterns.py      OHLC'den otomatik formasyon etiketleri
+model_egitimi.ipynb        Analiz, temizleme, eğitim, test ve tekli tahmin
+requirements.txt          Tek bağımlılık dosyası
+tests/                    Veri indirme, etiketleme ve üretim testleri
 docs/FORMASYON_KURALLARI.md Sayısal etiketleme tanımları
-docs/KAYNAKLAR.md          Araştırılan kaynaklar ve kullanım gerekçesi
-notebooks/inceleme.ipynb   Veri yükleme ve görüntü işleme incelemesi
-data/raw/                 Sıkıştırılmış gerçek OHLC ve sources.json
-data/cache/               Orijinal ZIP arşivleri ve SHA-256 dosyaları
-data/dataset/manifest.csv  Her görüntünün kaynağı, bölümü, konumu ve etiketleri
-data/dataset/geometry.npz  Çizilen OHLC pikselleri ve mum kutuları
-data/dataset/shards/       100.000 PNG + YOLO TXT + kutu JSON
-data/dataset/examples/     Her formasyondan bağımsız açılabilen örnek PNG
-data/dataset/metadata.json Dağılımlar, kurallar ve shard SHA-256 değerleri
-outputs/RAPOR.md           Gerçekte ölçülen sonuçlarla deney raporu
-outputs/metrics.json       F1, precision, recall, geometri ve bozulma deneyleri
-outputs/demo_input.png     Kullanıma hazır örnek
-outputs/demo_detected.png  Örneğin işaretlenmiş sonucu
+docs/KAYNAKLAR.md          Veri kaynakları
+data/cache/               Kaynak ZIP arşivleri ve SHA-256 dosyaları
+data/raw/                 Sayısal OHLC verileri ve sources.json
+data/dataset/             Manifest, PNG arşivleri, etiketler ve metadata
+outputs/cnn_notebook_.../  Notebook'un model, grafik ve test çıktıları
 ```
 
-### Veriyi Python ile aç
+### Veri dosyalarının biçimi
 
-```python
-import pandas as pd
-from mumvision.dataset import ImageStore
+Her ZIP içindeki `images/`, `labels/` ve `annotations/` dizinleri aynı örnek kimliğini kullanır. PNG'leri incelemek için notebook'taki örnek görüntü hücrelerini kullanın.
 
-manifest = pd.read_csv("data/dataset/manifest.csv", keep_default_na=False)
-with ImageStore("data/dataset") as store:
-    row = manifest.iloc[0]
-    bgr_image = store.read(row)
-    print(row["labels"], bgr_image.shape)
-```
+Nesne kutuları `xyxy` biçiminde, sağ/alt sınırlar hariç tutularak saklanır. YOLO TXT satırları `class_id x_center y_center width height` biçimindedir; koordinatlar görüntü boyutuna bölünmüştür. Sınıf sırası `classes.txt` içindedir. Bu etiketler, son-mum sınıflandırması için hazırlanan CNN'in kutu öğrendiği anlamına gelmez.
 
-Her shard içindeki `images/`, `labels/` ve `annotations/` dizinleri aynı örnek kimliğini kullanır. Nesne kutuları `xyxy` biçiminde, sağ/alt sınırlar hariç tutulacak şekilde saklanır. YOLO TXT satırları `class_id x_center y_center width height` biçimindedir; koordinatlar görüntü boyutuna bölünmüştür. Sınıf sırası `classes.txt` dosyasındadır. YOLO kullanımı için shard'lar bölüm bazında açılmalıdır; bu projede YOLO eğitilmemiştir.
+`geometry.npz` içindeki satır sırası `manifest.csv` ile aynıdır. `labels`: N×9 son-mum etiketleri; `ohlc_pixels`: N×24×4 çizim koordinatları; `boxes`: N×24×4 mum kutuları. Y ekseni yukarı yönlüdür; piksel OHLC değerleri mutlak piyasa fiyatı değildir.
 
-`geometry.npz` içindeki satır sırası `manifest.csv` ile aynıdır. `labels`: N×9 son-mum zayıf etiketleri; `ohlc_pixels`: N×24×4 çizim koordinatları; `boxes`: N×24×4 mum kutuları. Y ekseni yukarı yönlüdür; piksel OHLC değerleri mutlak piyasa fiyatı değildir.
-
-## Yeniden üretme ve doğrulama
-
-Mevcut veri seti hazırsa bu adımların tekrarı gerekmez. Yeni üretimde farklı bir veri dizini kullanılabilir:
+## Kontroller ve sınırlar
 
 ```powershell
-.\.venv\Scripts\python.exe -m mumvision download --data data_yeni
-.\.venv\Scripts\python.exe -m mumvision build --data data_yeni --count 100000
-.\.venv\Scripts\python.exe -m mumvision audit --data data_yeni --full
-.\.venv\Scripts\python.exe -m mumvision evaluate --data data_yeni --output outputs_yeni
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-İndirme kesilirse aynı komut doğrulanmış önbellekten devam eder. Mevcut `manifest.csv` dosyasının üzerine yazılmaz. Hızlı deneme için `--count 1000` kullanılabilir. Bölüm tarihleri `dataset.py` içindeki `SPLITS` ile sabittir; `download --start/--end` değiştirildiğinde bu aralıklar da uyumlu tutulmalıdır. Aynı aralıktaki mevcut verilerden yaklaşık 157 bin farklı pencere üretilebilir; daha fazlası için tarih veya varlık kapsamı genişletilmelidir.
+Veri indirilirken SHA-256, OHLC geometrisi ve tekrar eden zaman damgaları kontrol edilir. Üretimde eksik saat içeren veya bölüm sınırını geçen pencereler elenir. Notebook da seçilen görüntüleri ve ham veriyi eğitim öncesinde kontrol eder.
 
-Yalnız değerlendirme:
-
-```powershell
-.\.venv\Scripts\python.exe -m mumvision evaluate
-.\.venv\Scripts\python.exe -m mumvision audit --full
-```
-
-Sonuçlar [deney raporunda](outputs/RAPOR.md) ve makine tarafından okunabilir [ölçüm dosyasında](outputs/metrics.json) bulunur. Kurulumdaki tam paket sürümleri `requirements-lock.txt` dosyasındadır.
-
-Tarayıcıda açılabilen, görselleri içine gömülü paylaşılabilir rapor: `outputs/RAPOR.html`. Notebook için `.venv` çekirdeğini seçin; başka bir bilgisayarda gerekirse `python -m pip install -r requirements-notebook.txt` çalıştırın.
-
-## Yöntemin sınırları
-
-Klasik görüntü işleme hattı: **HSV → renk eşikleme → yatay morfolojik açma → bağlı bileşenler → gövde/fitil ölçümü → formasyon kuralları**. Çalışmak için model eğitimi veya API anahtarı gerekmez. Eğitim ve doğrulama verileri ileride öğrenen yöntemler için de hazırlanmıştır.
-
-Kırmızı/yeşil, içi dolu mumlar ve doğrusal fiyat ekseni hedeflenir. Hacim çubukları, renkli indikatörler, yazılar ve arayüz simgeleri segmentasyonu etkileyebilir; fiyat paneli kırpılmalıdır. Logaritmik eksen, siyah/beyaz ve içi boş mumlar desteklenmez.
-
-F1 değerleri otomatik OHLC kural etiketleriyle uyumu ölçer. Bu, farklı platformlardan uzman etiketli görüntülerde başarı veya yatırım getirisi anlamına gelmez. Görüntüye çizim sırasındaki piksel yuvarlaması bile eşik yakınındaki etiketleri değiştirebilir; raporda bu etki ayrı ölçülür. Sonraki bilimsel değerlendirme adımı bağımsız, elle etiketli ekran görüntüleriyle dış testtir.
+Görseller gerçek sayısal piyasa verilerinden programatik olarak çizilir; internetten hazır etiketli resimler indirilmez. Etiketler otomatik OHLC kurallarına dayanır ve uzman doğrulaması değildir. Piksel yuvarlama ve küçültme ince fitillerde bilgi kaybına yol açabilir. Test metrikleri bu zayıf etiketlerle uyumu ölçer; farklı platform görüntülerinde uzman doğruluğu veya finansal getiri göstermez.

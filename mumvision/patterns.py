@@ -1,4 +1,4 @@
-"""Explicit project rules, shared by weak labelling and pixel-based inference.
+"""Explicit project rules for weak labelling of market OHLC windows.
 
 These are geometric research definitions, not exact TA-Lib equivalents.
 Multiple patterns may be true at the same candle. No future bars are used.
@@ -11,10 +11,6 @@ import numpy as np
 PATTERNS = (
     "doji", "hammer", "inverted_hammer", "hanging_man", "shooting_star",
     "bullish_engulfing", "bearish_engulfing", "morning_star", "evening_star",
-)
-TURKISH = (
-    "Doji", "Çekiç", "Ters Çekiç", "Asılı Adam", "Kayan Yıldız",
-    "Boğa Yutan", "Ayı Yutan", "Sabah Yıldızı", "Akşam Yıldızı",
 )
 SPANS = (1, 1, 1, 1, 1, 2, 2, 3, 3)
 

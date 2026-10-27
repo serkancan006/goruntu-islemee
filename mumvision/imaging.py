@@ -1,17 +1,10 @@
-"""Chart rendering and image IO, including Unicode paths on Windows."""
+"""Render chart PNGs and generate annotation boxes for the dataset."""
 from pathlib import Path
 
 import cv2
 import numpy as np
 
 from .patterns import PATTERNS, SPANS
-
-
-def read_image(path):
-    result = cv2.imdecode(np.frombuffer(Path(path).read_bytes(), np.uint8), cv2.IMREAD_COLOR)
-    if result is None:
-        raise ValueError(f"Görüntü okunamadı: {path}")
-    return result
 
 
 def png_bytes(image):

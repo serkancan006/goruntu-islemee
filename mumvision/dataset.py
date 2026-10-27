@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .download import SYMBOLS
+from .download import SYMBOLS, download_market
 from .imaging import pattern_objects, png_bytes, render_chart, write_image, yolo_text
 from .patterns import PATTERNS, RuleConfig, label_names, pattern_matrix
 
@@ -40,10 +40,16 @@ def build_dataset(root="data", count=100_000, window=24, seed=42, shard_size=200
     target = root / "dataset"
     if (target / "manifest.csv").exists():
         raise FileExistsError("Veri seti mevcut. Yeni üretim için farklı --data dizini kullanın.")
+    missing = tuple(symbol for symbol in SYMBOLS if not (root / "raw" / f"{symbol}-1h.csv.gz").is_file())
+    if missing:
+        start_month = min(start for start, _, _ in SPLITS.values())[:7]
+        end_month = (pd.Timestamp(max(end for _, end, _ in SPLITS.values())) - pd.Timedelta(days=1)).strftime("%Y-%m")
+        print(f"Eksik ham veriler indiriliyor: {', '.join(missing)} ({start_month}–{end_month})", flush=True)
+        download_market(root, start=start_month, end=end_month, symbols=missing)
+    frames = {symbol: pd.read_csv(root / "raw" / f"{symbol}-1h.csv.gz") for symbol in SYMBOLS}
     target.mkdir(parents=True, exist_ok=True)
     (target / "shards").mkdir(exist_ok=True)
     (target / "examples").mkdir(exist_ok=True)
-    frames = {symbol: pd.read_csv(root / "raw" / f"{symbol}-1h.csv.gz") for symbol in SYMBOLS}
     arrays = {symbol: frame[["open", "high", "low", "close"]].to_numpy() for symbol, frame in frames.items()}
     rng = np.random.default_rng(seed)
     selections, available = [], {}
@@ -148,32 +154,3 @@ def build_dataset(root="data", count=100_000, window=24, seed=42, shard_size=200
     (target / "dataset.yaml").write_text("# Extract shard images/ and labels/ into train/, val/, test/ first.\npath: .\ntrain: train/images\nval: val/images\ntest: test/images\nnames:\n" + "".join(f"  {i}: {name}\n" for i, name in enumerate(PATTERNS)), encoding="utf-8")
     print(f"{count:,} grafik, {sum(sum(c.values()) for c in bbox_counts.values()):,} formasyon kutusu üretildi.", flush=True)
     return metadata
-
-
-class ImageStore:
-    def __init__(self, dataset_dir):
-        self.root = Path(dataset_dir)
-        self.name, self.archive = None, None
-
-    def read(self, row):
-        import cv2
-        if row["shard"] != self.name:
-            self.close()
-            self.name = row["shard"]
-            self.archive = zipfile.ZipFile(self.root / "shards" / self.name)
-        image = cv2.imdecode(np.frombuffer(self.archive.read(row["image"]), np.uint8), cv2.IMREAD_COLOR)
-        if image is None:
-            raise ValueError(f"Bozuk PNG: {row['image']}")
-        return image
-
-    def close(self):
-        if self.archive is not None:
-            self.archive.close()
-            self.archive = None
-        self.name = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_):
-        self.close()

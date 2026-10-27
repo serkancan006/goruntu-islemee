@@ -37,4 +37,4 @@ Kesintisiz işlem gören kripto verilerinde klasik açılış boşlukları zorun
 
 Pencere etiketi, formasyonu **son mumda tamamlayan** sınıfları içerir. Nesne etiketleri ise pencere içindeki tamamlanmış bütün formasyonları içerir. Trend için gereken geçmiş görüntü dışında kalırsa, o konumdaki trendli etiket nesne listesine yazılmaz. Kutular, formasyonun 1–3 mumunun fitilleriyle birlikte birleşimidir; geçmiş trend mumları kutuya dahil edilmez.
 
-Ham OHLC üzerinde etiket üretimi ve görüntüden çıkarılan piksel OHLC üzerinde tespit aynı kuralları kullanır. Görüntüdeki çözünürlük kaybı ve eşik sınırındaki örnekler, geometri kusursuz çıkarılsa bile uyuşmazlık yaratabilir. Bu nedenle test raporu gerçek OHLC uyumu ile yalnız piksel yuvarlama uyumunu ayrı gösterir.
+Bu kurallar yalnız veri setinin ham OHLC üzerinden otomatik etiketlenmesinde kullanılır. Notebook'taki CNN, görüntülerden bu etiketleri öğrenir; tahmin sırasında OHLC kurallarını çalıştırmaz. Çizimde piksel yuvarlaması ve görüntü küçültme, eşik yakınındaki örneklerde görsel bilgi kaybına neden olabilir. Test metrikleri otomatik etiketlerle uyumu ölçer; bağımsız uzman doğruluğunu veya yatırım getirisini ölçmez.

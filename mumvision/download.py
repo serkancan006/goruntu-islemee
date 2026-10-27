@@ -73,6 +73,8 @@ def download_market(root="data", start="2023-01", end="2025-12", symbols=SYMBOLS
     cache, raw = root / "cache", root / "raw"
     cache.mkdir(parents=True, exist_ok=True)
     raw.mkdir(parents=True, exist_ok=True)
+    sources_path = raw / "sources.json"
+    previous = json.loads(sources_path.read_text(encoding="utf-8")) if sources_path.exists() else {}
     months = [str(period) for period in pd.period_range(start, end, freq="M")]
     frames = {symbol: [] for symbol in symbols}
     records, errors = [], []
@@ -106,11 +108,17 @@ def download_market(root="data", start="2023-01", end="2025-12", symbols=SYMBOLS
                           "start": pd.to_datetime(frame.timestamp_ms.min(), unit="ms", utc=True).isoformat(),
                           "end": pd.to_datetime(frame.timestamp_ms.max(), unit="ms", utc=True).isoformat(),
                           "file": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+    # Eksik varlıklar indirilirken diğer ham dosyaların kaynak kayıtlarını koru.
+    retained = [record for record in previous.get("symbols", [])
+                if record["symbol"] not in symbols and (raw / record["file"]).is_file()]
+    retained_symbols = {record["symbol"] for record in retained}
+    summaries = sorted(retained + summaries, key=lambda record: record["symbol"])
+    records = [record for record in previous.get("archives", []) if record["symbol"] in retained_symbols] + records
     provenance = {"source": "Binance Public Data, SPOT 1h", "synthetic_prices": False,
                   "timestamp_unit": "milliseconds UTC (normalized)", "symbols": summaries,
                   "total_candles": sum(s["rows"] for s in summaries),
                   "terms_url": "https://github.com/binance/binance-public-data/blob/master/TERMS_AND_CONDITIONS.md",
                   "archives": sorted(records, key=lambda item: (item["symbol"], item["month"]))}
-    (raw / "sources.json").write_text(json.dumps(provenance, indent=2, ensure_ascii=False), encoding="utf-8")
+    sources_path.write_text(json.dumps(provenance, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Toplam {provenance['total_candles']:,} gerçek OHLC mumu hazır.", flush=True)
     return provenance
